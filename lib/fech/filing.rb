@@ -3,7 +3,7 @@ require 'open-uri'
 require 'ensure/encoding'
 
 module Fech
-  
+
   # Fech::Filing downloads an Electronic Filing given its ID, and will search
   # rows by row type. Using a child Translator object, the data in each row
   # is automatically mapped at runtime into a labeled Hash. Additional
@@ -11,8 +11,8 @@ module Fech
   class Filing
     # first filing number using the version >=3.00 format
     # note that there are plenty of <v3 filings after this, so readable? still needs to be checked
-    FIRST_V3_FILING = 11850 
-    
+    FIRST_V3_FILING = 11850
+
     attr_accessor :filing_id, :download_dir
 
     # Create a new Filing object, assign the download directory to system's
@@ -44,7 +44,7 @@ module Fech
       end
       self
     end
-    
+
     # Access the header (first) line of the filing, containing information
     # about the filing's version and metadata about the software used to file it.
     # @return [Hash] a hash that assigns labels to the values of the filing's header row
@@ -53,7 +53,7 @@ module Fech
         return parse_row?(row)
       end
     end
-    
+
     # Access the summary (second) line of the filing, containing aggregate and
     # top-level information about the filing.
     # @return [Hash] a hash that assigns labels to the values of the filing's summary row
@@ -63,7 +63,7 @@ module Fech
         return parse_row?(row)
       end
     end
-    
+
     # Access all lines of the filing that match a given row type. Will return an
     # Array of all available lines if called directly, or will yield the mapped
     # rows one by one if a block is passed.
@@ -88,7 +88,7 @@ module Fech
       end
       block_given? ? nil : data
     end
-    
+
     # Decides what to do with a given row. If the row's type matches the desired
     # type, or if no type was specified, it will run the row through #map.
     # If :raw was passed true, a flat, unmapped data array will be returned.
@@ -119,14 +119,14 @@ module Fech
     def map(row, opts={})
       data = Fech::Mapped.new(self, row.first)
       full_row_map = map_for(row.first)
-      
+
       # If specific fields were asked for, return only those
       if opts[:include]
         row_map = full_row_map.select { |k| opts[:include].include?(k) }
       else
         row_map = full_row_map
       end
-      
+
       # Inserts the row into data, performing any specified preprocessing
       # on individual cells along the way
       row_map.each_with_index do |field, index|
@@ -141,7 +141,7 @@ module Fech
         end
         data[field] = value
       end
-      
+
       # Performs any specified group preprocessing / combinations
       if translator
         combinations = translator.get_translations(:row => row.first,
@@ -156,14 +156,14 @@ module Fech
       end
       data
     end
-    
+
     # Returns the column names for given row type and the filing's version
     # in the order they appear in row data.
     # @param [String, Regexp] row_type representation of the row desired
     def map_for(row_type)
       mappings.for_row(row_type)
     end
-    
+
     # Returns the column names for given row type and version in the order
     # they appear in row data.
     # @param [String, Regexp] row_type representation of the row desired
@@ -171,7 +171,7 @@ module Fech
     def self.map_for(row_type, opts={})
       Fech::Mappings.for_row(row_type, opts)
     end
-    
+
     # Accessor for @translator. Will return the Translator initialized in
     # Filing's initializer if built-in translations were passed to Filing's
     # initializer ({:translate => [:foo, :bar]}).
@@ -190,19 +190,19 @@ module Fech
         translator
       end
     end
-    
+
     # Whether this filing amends a previous filing or not.
     def amendment?
       !amends.nil?
     end
-    
+
     # Returns the filing ID of the past filing this one amends,
     # nil if this is a first-draft filing.
     # :report_id in the HDR line references the amended filing
     def amends
       header[:report_id]
     end
-    
+
     # Combines an array of keys and values into an Fech::Mapped object,
     # a type of Hash.
     # @param [Array] keys the desired keys for the new hash
@@ -211,12 +211,12 @@ module Fech
     def hash_zip(keys, values)
       Fech::Mapped.new(self, values.first).merge(Hash[*keys.zip(values).flatten])
     end
-    
+
     # The version of the FEC software used to generate this Filing
     def filing_version
       @filing_version ||= parse_filing_version
     end
-    
+
     # Pulls out the version number from the header line.
     # Must parse this line manually, since we don't know the version yet, and
     # thus the delimiter type is still a mystery.
@@ -228,12 +228,12 @@ module Fech
         @csv_parser.parse(first, :col_sep => "\034").flatten[2]
       end
     end
-    
+
     # Only FEC format 3.00 + is supported
     def readable?
       filing_version.to_i >= 3
     end
-    
+
     # Gets or creats the Mappings instance for this filing_version
     def mappings
       @mapping ||= Fech::Mappings.new(filing_version)
@@ -279,16 +279,16 @@ module Fech
     def fix_f99_contents
       @customized = true
       content = file_contents.read
-      
+
       if RUBY_VERSION > "1.9.2"
         content.encode!('UTF-16', 'UTF-8', :invalid => :replace, :undef => :replace, :replace => '?')
         content.encode!('UTF-8', 'UTF-16')
       else
         require 'iconv'
-        ic = Iconv.new('UTF-8//IGNORE', 'UTF-8') 
+        ic = Iconv.new('UTF-8//IGNORE', 'UTF-8')
         content = ic.iconv(content + ' ')[0..-2] # add valid byte before converting, then remove it
       end
-      
+
       regex = /\n\[BEGINTEXT\]\n(.*?)\[ENDTEXT\]\n/mi # some use eg [EndText]
       match = content.match(regex)
       if match
@@ -311,7 +311,7 @@ module Fech
     end
 
     def filing_url
-      "http://docquery.fec.gov/dcdev/posted/#{filing_id}.fec"
+      "https://docquery.fec.gov/dcdev/posted/#{filing_id}.fec"
     end
 
     # Iterates over and yields the Filing's lines
@@ -341,11 +341,11 @@ module Fech
     def each_row_with_index(&block)
       each_row(:with_index => true, &block)
     end
-    
+
     # @return [String] the delimiter used in the filing's version
     def delimiter
       filing_version.to_f < 6 ? "," : "\034"
     end
-    
+
   end
 end
